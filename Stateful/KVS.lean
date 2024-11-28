@@ -5,6 +5,7 @@ The most dumb key-value store
 import Lean.Exception
 
 open Lean (MonadError)
+open Std (HashMap)
 open System (FilePath)
 
 
@@ -14,8 +15,6 @@ class KVS (m : Type → Type) where
   get   : Nat          → m String
   set   : Nat → String → m Unit
 
-
--- IO
 
 -- Data structure to read/write and work with
 
@@ -37,11 +36,10 @@ def KV.lookup [Monad m] [MonadExcept String m] (k : Nat) (kv : KV) : m String :=
 def KV.set (k : Nat) (v : String) (kv : KV) : KV :=
   kv.find? (fun (n, _) => n == k) |> (Option.elim · (kv.push ⟨k, v⟩) (fun _ => kv.set! k ⟨k, v⟩)) -- TODO: prove the indexing is safe
 
--- set_option diagnostics true
--- set_option diagnostics.threshold 60
 
+-- IO
 
-instance : KVS (StateT KV (ExceptT String IO)) where
+instance iokvs : KVS (StateT KV (ExceptT String IO)) where
 
   load path  := IO.FS.lines path >>= Array.mapM parseLine >>= set
 
@@ -49,6 +47,28 @@ instance : KVS (StateT KV (ExceptT String IO)) where
     let s ← (KV.toString <$> get)
     IO.FS.writeFile path s
 
-  get n := get >>= KV.lookup n
+  get n      := get >>= KV.lookup n
 
-  set k v := modify (KV.set k v)
+  set k v    := modify (KV.set k v)
+
+
+-- pure
+
+abbrev FS := HashMap FilePath KV
+
+-- set_option diagnostics true
+-- set_option diagnostics.threshold 60
+
+instance purekvs : KVS (StateT FS (StateT KV (Except String))) where
+
+  load path  := do
+    let fs ← getThe FS
+    (fs.get? path).elim (throw "Missing file") set
+
+  store path := do
+    let kv ← getThe KV
+    modifyThe FS fun fs => fs.insert path kv
+
+  get n      := getThe KV >>= KV.lookup n
+
+  set k v    := modifyThe KV (KV.set k v)
