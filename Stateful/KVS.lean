@@ -72,3 +72,17 @@ instance purekvs : KVS (StateT FS (StateT KV (Except String))) where
   get n      := getThe KV >>= KV.lookup n
 
   set k v    := modifyThe KV (KV.set k v)
+
+
+-- Lawful
+
+class LawfulKVS (m : Type → Type) [Monad m] [KVS m] : Prop where
+
+  set_get : ∀ k v, KVS.set k v >>= (fun _ => KVS.get k) = pure (f := m) v
+
+  set_set : ∀ k v1 v2, KVS.set k v1 >>= (fun _ => KVS.set k v2) = KVS.set (m := m) k v2
+
+
+  -- level up
+
+  store_store : ∀ path, KVS.store path >>= (fun _ => KVS.store path) = KVS.store (m := m) path
