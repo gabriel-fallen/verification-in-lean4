@@ -118,3 +118,11 @@ def Command.toStackOps : (c : Command) → c.stackType
   | .top    => .top
   | .add    => onlyAdd
   | .quit   => PUnit.unit
+
+
+-- TODO: Lawful stack
+
+abbrev push_top_prog {h : Nat} (v : α) : StackOps α h (h+1) α := (StackOps.push v).bind (fun _ => .top)
+
+theorem push_top : ∀ (s : Vector α h) (v : α), (runStackOp s (push_top_prog v)).fst = v := by
+  sorry
